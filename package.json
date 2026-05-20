@@ -1,0 +1,19 @@
+{
+  "name": "fpcontentmanager",
+  "version": "200526b1",
+  "private": true,
+  "description": "Browser-side Facebook Page content export, import, and cleanup tooling.",
+  "scripts": {
+    "check": "node --check fpcontent-og-packager.js && node --check fpcontent-manager.js && node --check fpcontent-loader.js",
+    "build": "node fpcontent-og-packager.js --base-url=https://fpcontentmanager.pages.dev/fpcontent",
+    "deploy": "npx wrangler pages deploy ./dist --project-name=fpcontentmanager --branch=main --commit-dirty=true"
+  },
+  "keywords": [
+    "facebook",
+    "bookmarklet",
+    "yellow-web"
+  ],
+  "author": "Yellow Web",
+  "license": "UNLICENSED",
+  "devDependencies": {}
+}
