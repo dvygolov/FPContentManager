@@ -51,8 +51,12 @@ function buildAppMarkSvg() {
     '    </linearGradient>',
     '  </defs>',
     '  <rect x="4" y="4" width="88" height="88" rx="22" fill="#151515" stroke="url(#fpcontent-gold)" stroke-width="6"/>',
-    '  <text x="48" y="61" text-anchor="middle" font-family="Trebuchet MS, Verdana, sans-serif" font-size="34" font-weight="900" letter-spacing="-3" fill="url(#fpcontent-gold)">RM</text>',
-  '</svg>',
+    '  <rect x="25" y="20" width="42" height="54" rx="6" fill="#222" stroke="#fff2bd" stroke-width="4"/>',
+    '  <path d="M34 34h24M34 45h24M34 56h14" stroke="url(#fpcontent-gold)" stroke-width="5" stroke-linecap="round"/>',
+    '  <rect x="42" y="33" width="30" height="24" rx="5" fill="#151515" stroke="url(#fpcontent-gold)" stroke-width="4"/>',
+    '  <circle cx="51" cy="42" r="4" fill="#fff2bd"/>',
+    '  <path d="m46 53 8-8 5 5 4-4 6 7" fill="none" stroke="#ffd000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>',
+    '</svg>',
   ].join("\n");
 }
 
@@ -128,8 +132,8 @@ function buildManifestHtml({ appName, build, manifestBase64 }) {
   ].join("\n");
 }
 
-function buildLandingHtml({ appName, build, bookmarklet, manifestUrl, screenshotUrl, iconUrl }) {
-  const title = `${appName} Loader`;
+function buildLandingHtml({ appName, displayName = appName, build, bookmarklet, manifestUrl, screenshotUrl, iconUrl }) {
+  const title = `${displayName} Loader`;
   const inlineMark = buildAppMarkSvg();
   return [
     "<!doctype html>",
@@ -139,7 +143,7 @@ function buildLandingHtml({ appName, build, bookmarklet, manifestUrl, screenshot
     '  <meta name="viewport" content="width=device-width, initial-scale=1" />',
     `  <title>${escapeHtml(title)}</title>`,
     '  <meta name="robots" content="noindex,nofollow" />',
-    `  <meta name="description" content="${escapeHtml(appName)} bookmarklet loader for Facebook Page content export, import, and cleanup." />`,
+    `  <meta name="description" content="${escapeHtml(displayName)} bookmarklet loader for Facebook Page content export, import, and cleanup." />`,
     `  <link rel="icon" href="${escapeHtml(iconUrl)}" type="image/svg+xml" />`,
     "  <style>",
     "    :root {",
@@ -372,7 +376,7 @@ function buildLandingHtml({ appName, build, bookmarklet, manifestUrl, screenshot
     "  <main>",
     "    <nav class=\"nav\">",
     "      <div class=\"brand-wrap\">",
-    `        <div class="brand-line"><span class="brand-mark">${inlineMark}</span><div class="brand">${escapeHtml(appName)}</div></div>`,
+    `        <div class="brand-line"><span class="brand-mark">${inlineMark}</span><div class="brand">${escapeHtml(displayName)}</div></div>`,
     "        <div class=\"byline\">by <a href=\"https://yellowweb.top\" target=\"_blank\" rel=\"noopener\">Yellow Web</a></div>",
     "      </div>",
     "      <div class=\"nav-links\"><a href=\"#install\">Install</a><a href=\"#features\">Features</a><a href=\"#how\">How it works</a><a class=\"tg-link\" href=\"https://t.me/yellow_web\" target=\"_blank\" rel=\"noopener\" aria-label=\"Yellow Web Telegram\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"currentColor\" d=\"M21.8 4.6 18.6 19.7c-.2 1.1-.9 1.4-1.8.9l-5-3.7-2.4 2.3c-.3.3-.5.5-1 .5l.4-5.1 9.3-8.4c.4-.4-.1-.6-.6-.2L6 13.2 1.1 11.7c-1.1-.3-1.1-1.1.2-1.6L20.5 2.7c.9-.3 1.7.2 1.3 1.9Z\"/></svg></a></div>",
@@ -380,7 +384,7 @@ function buildLandingHtml({ appName, build, bookmarklet, manifestUrl, screenshot
     "    <section class=\"hero\" id=\"install\">",
     "      <div class=\"hero-grid\">",
     "        <div>",
-    `          <div class="eyebrow">${escapeHtml(appName)} build ${escapeHtml(build)}</div>`,
+    `          <div class="eyebrow">${escapeHtml(displayName)} build ${escapeHtml(build)}</div>`,
     "          <h1>Facebook Page content export and cleanup in one panel.</h1>",
     "          <p class=\"lead\">FPContentManager is a browser-side tool for exporting Facebook Page posts, photos, and videos to JSON, importing text posts from a saved package, and cleaning Page content after explicit confirmation.</p>",
     "          <div class=\"install\">",
@@ -456,6 +460,7 @@ function main() {
   const distRoot = path.dirname(outRoot);
   const baseUrl = readArg("base-url", "");
   const appName = readArg("app", "FPContentManager");
+  const displayName = "FP Content Manager";
   const chunkOgObjectIds = parseListArg("chunk-og-object-ids");
   const source = fs.readFileSync(sourcePath, "utf8");
   const build = readArg("build", detectBuild(source));
@@ -550,6 +555,7 @@ function main() {
   writeFile(path.join(distRoot, APP_MARK_FILE), `${buildAppMarkSvg()}\n`);
   writeFile(path.join(distRoot, "index.html"), buildLandingHtml({
     appName,
+    displayName,
     build,
     bookmarklet,
     manifestUrl: publicUrl("latest/manifest.html"),
