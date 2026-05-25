@@ -1,30 +1,30 @@
 {
   "app": "FPContentManager",
-  "build": "200526b1",
-  "version": "200526b1",
-  "generatedAt": "2026-05-20T20:07:54.309Z",
+  "build": "250526b1",
+  "version": "250526b1",
+  "generatedAt": "2026-05-25T10:30:57.680Z",
   "payload": {
     "encoding": "base64",
-    "sha256": "cd7d1e68d15bd801c74d521ad747a503ba87171352e9b9c6810ee335910a6f7c",
-    "byteLength": 15080
+    "sha256": "fe5fe355cfa42577688490bd97f0e99cdabc606a198d1a43437ae293d37a9344",
+    "byteLength": 18002
   },
   "chunks": [
     {
       "index": 1,
       "file": "og/chunk-001.html",
-      "url": "https://fpcontentmanager.pages.dev/fpcontent/200526b1/og/chunk-001.html",
+      "url": "https://fpcontentmanager.pages.dev/fpcontent/250526b1/og/chunk-001.html",
       "latestUrl": "https://fpcontentmanager.pages.dev/fpcontent/latest/og/chunk-001.html",
       "ogObjectId": "",
-      "base64Length": 20108,
-      "base64Sha256": "8d6b115397e210316fec5dbf3b49f4bda7c8b61aadd0489fb2284171c03e7db1"
+      "base64Length": 24004,
+      "base64Sha256": "579f572d728b222c70fe863fc112eb746219a698b44b1cf716262f349eb34b6c"
     }
   ],
   "source": "fpcontent-manager.js",
   "chunkSize": 350000,
   "payloadFile": "payload.js",
-  "payloadUrl": "https://fpcontentmanager.pages.dev/fpcontent/200526b1/payload.js",
+  "payloadUrl": "https://fpcontentmanager.pages.dev/fpcontent/250526b1/payload.js",
   "latestPayloadUrl": "https://fpcontentmanager.pages.dev/fpcontent/latest/payload.js",
   "manifestFile": "manifest.html",
-  "manifestUrl": "https://fpcontentmanager.pages.dev/fpcontent/200526b1/manifest.html",
+  "manifestUrl": "https://fpcontentmanager.pages.dev/fpcontent/250526b1/manifest.html",
   "latestManifestUrl": "https://fpcontentmanager.pages.dev/fpcontent/latest/manifest.html"
 }
