@@ -2,7 +2,7 @@
   "use strict";
 
   const Config = {
-    VERSION: "250526b3",
+    VERSION: "250526b4",
     APP: "FPContentManager",
     API_URL: "https://graph.facebook.com/v23.0/",
   };
@@ -129,12 +129,24 @@
       return this.request(path, {}, { method: "DELETE" });
     }
 
-    async getAll(path, params = {}) {
+    async getAll(path, params = {}, options = {}) {
       let url = this.url(path, params);
       const items = [];
-      while (url) {
+      const maxItems = Number.isFinite(options.maxItems) && options.maxItems > 0 ? Math.floor(options.maxItems) : Infinity;
+      const maxPages = Number.isFinite(options.maxPages) && options.maxPages > 0 ? Math.floor(options.maxPages) : Infinity;
+      const seenUrls = new Set();
+      let pageCount = 0;
+      while (url && items.length < maxItems && pageCount < maxPages) {
+        if (seenUrls.has(url)) throw new Error(`Graph pagination loop detected for ${path}.`);
+        seenUrls.add(url);
+        pageCount += 1;
         const page = await this.request(url);
-        if (Array.isArray(page.data)) items.push(...page.data);
+        if (Array.isArray(page.data)) {
+          for (const item of page.data) {
+            if (items.length >= maxItems) break;
+            items.push(item);
+          }
+        }
         url = page.paging?.next || "";
       }
       return items;
@@ -271,7 +283,10 @@
     return api.getAll(`${sourcePageId}/posts`, {
       fields: "id,message,created_time,attachments{media,media_type,type,title,url,description,subattachments{media,media_type,type,title,url,description}}",
       limit,
-    }).then((posts) => posts.slice(0, limit));
+    }, {
+      maxItems: limit,
+      maxPages: Math.max(1, Math.ceil(limit / 100) + 1),
+    });
   }
 
   function relevantStoryId(id) {
