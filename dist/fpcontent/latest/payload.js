@@ -2,7 +2,7 @@
   "use strict";
 
   const Config = {
-    VERSION: "250526b4",
+    VERSION: "250526b5",
     APP: "FPContentManager",
     API_URL: "https://graph.facebook.com/v23.0/",
   };
@@ -101,7 +101,23 @@
     }
 
     async request(path, params = {}, init = {}) {
-      const response = await fetch(this.url(path, params), { credentials: "include", cache: "no-store", ...init });
+      const requestUrl = this.url(path, params);
+      let response;
+      try {
+        response = await fetch(requestUrl, {
+          mode: "cors",
+          credentials: "include",
+          redirect: "follow",
+          referrer: "https://adsmanager.facebook.com/",
+          referrerPolicy: "strict-origin-when-cross-origin",
+          cache: "no-store",
+          ...init,
+        });
+      } catch (error) {
+        const method = init.method || "GET";
+        const endpoint = requestUrl.replace(/\?.*$/, "");
+        throw new Error(`${method} ${endpoint} failed: ${error.message}`);
+      }
       const text = await response.text();
       let json = {};
       try {
@@ -122,7 +138,11 @@
       Object.entries(body).forEach(([key, value]) => {
         if (value !== undefined && value !== null) form.set(key, String(value));
       });
-      return this.request(path, {}, { method: "POST", body: form });
+      return this.request(path, {}, {
+        method: "POST",
+        body: form.toString(),
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+      });
     }
 
     delete(path) {
@@ -281,7 +301,7 @@
   async function fetchSourcePosts(sourcePageId, limit) {
     const api = new GraphApi();
     return api.getAll(`${sourcePageId}/posts`, {
-      fields: "id,message,created_time,attachments{media,media_type,type,title,url,description,subattachments{media,media_type,type,title,url,description}}",
+      fields: "id,message,created_time,permalink_url,attachments{media,media_type,type,title,url,description,subattachments{media,media_type,type,title,url,description}}",
       limit,
     }, {
       maxItems: limit,
@@ -350,19 +370,29 @@
     const created = [];
     if (images.length) {
       for (const imageUrl of images) {
-        const response = await api.post(`${targetPage.id}/photos`, {
-          url: imageUrl,
-          caption: message,
-        });
-        created.push(response.post_id || response.id);
+        try {
+          const response = await api.post(`${targetPage.id}/photos`, {
+            url: imageUrl,
+            caption: message,
+          });
+          created.push(response.post_id || response.id);
+        } catch (error) {
+          log(`Photo copy failed for ${sourcePost.id}: ${error.message}`, "warning");
+        }
       }
+      if (created.length) {
+        return created;
+      }
+      log(`Trying feed fallback for ${sourcePost.id}.`, "warning");
+    }
+    const fallbackBody = {};
+    if (message) fallbackBody.message = message;
+    if (sourcePost.permalink_url) fallbackBody.link = sourcePost.permalink_url;
+    if (!fallbackBody.message && !fallbackBody.link) {
+      log(`Skipping ${sourcePost.id}: no text, link, or copyable image media.`, "warning");
       return created;
     }
-    if (!message) {
-      log(`Skipping ${sourcePost.id}: no text or image media.`, "warning");
-      return created;
-    }
-    const response = await api.post(`${targetPage.id}/feed`, { message });
+    const response = await api.post(`${targetPage.id}/feed`, fallbackBody);
     created.push(response.id);
     return created;
   }
