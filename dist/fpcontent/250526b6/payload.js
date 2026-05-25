@@ -2,7 +2,7 @@
   "use strict";
 
   const Config = {
-    VERSION: "250526b5",
+    VERSION: "250526b6",
     APP: "FPContentManager",
     API_URL: "https://graph.facebook.com/v23.0/",
   };
@@ -284,29 +284,57 @@
     return Math.min(Math.floor(value), 250);
   }
 
-  function collectImageUrls(attachments = []) {
-    const urls = [];
+  function collectPostMedia(attachments = []) {
+    const images = [];
+    const videos = [];
+    const seenImages = new Set();
+    const seenVideos = new Set();
     const visit = (node) => {
       if (!node) return;
       const media = node.media || node;
+      const type = String(node.media_type || node.type || "").toLowerCase();
+      const target = node.target || {};
+      const targetId = target.id ? String(target.id) : "";
+      const sourceUrl = media?.source || media?.playable_url || node.source || "";
+      const isVideo = type.includes("video") || Boolean(sourceUrl && targetId);
+      if (isVideo) {
+        const key = targetId || sourceUrl || node.url || JSON.stringify(node).slice(0, 120);
+        if (!seenVideos.has(key)) {
+          seenVideos.add(key);
+          videos.push({
+            id: targetId,
+            sourceUrl,
+            title: node.title || "",
+            description: node.description || "",
+            url: node.url || target.url || "",
+          });
+        }
+      }
       const imageUrl = media?.image?.src || media?.photo_image?.uri || "";
-      if (imageUrl) urls.push(imageUrl);
+      if (imageUrl && !isVideo && !seenImages.has(imageUrl)) {
+        seenImages.add(imageUrl);
+        images.push(imageUrl);
+      }
       const sub = node.subattachments?.data || node.child_attachments || [];
       if (Array.isArray(sub)) sub.forEach(visit);
     };
     attachments.forEach(visit);
-    return [...new Set(urls)];
+    return { images, videos };
   }
 
   async function fetchSourcePosts(sourcePageId, limit) {
     const api = new GraphApi();
-    return api.getAll(`${sourcePageId}/posts`, {
-      fields: "id,message,created_time,permalink_url,attachments{media,media_type,type,title,url,description,subattachments{media,media_type,type,title,url,description}}",
-      limit,
+    const fetchLimit = Math.min(250, Math.max(limit, Math.min(100, limit + 20)));
+    const posts = await api.getAll(`${sourcePageId}/posts`, {
+      fields: "id,message,created_time,permalink_url,attachments{target{id,url},media,media_type,type,title,url,description,subattachments{target{id,url},media,media_type,type,title,url,description}}",
+      limit: fetchLimit,
     }, {
-      maxItems: limit,
-      maxPages: Math.max(1, Math.ceil(limit / 100) + 1),
+      maxItems: fetchLimit,
+      maxPages: Math.max(1, Math.ceil(fetchLimit / 100) + 1),
     });
+    return posts
+      .sort((left, right) => new Date(right.created_time || 0).getTime() - new Date(left.created_time || 0).getTime())
+      .slice(0, limit);
   }
 
   function relevantStoryId(id) {
@@ -363,38 +391,84 @@
     return { updated, total: ids.length };
   }
 
-  async function publishPostToTarget(targetPage, sourcePost) {
-    const api = new GraphApi(targetPage.accessToken || runtimeToken());
-    const message = String(sourcePost.message || "").trim();
-    const images = collectImageUrls(sourcePost.attachments?.data || []);
+  async function resolveVideoSource(api, video) {
+    if (video.sourceUrl) return video.sourceUrl;
+    if (!video.id) return "";
+    const details = await api.get(video.id, { fields: "id,source,permalink_url,title,description" });
+    if (details.title && !video.title) video.title = details.title;
+    if (details.description && !video.description) video.description = details.description;
+    if (details.permalink_url && !video.url) video.url = details.permalink_url;
+    return details.source || "";
+  }
+
+  async function publishVideoToTarget(api, targetPage, sourcePost, video, index) {
+    const sourceUrl = await resolveVideoSource(api, video);
+    if (!sourceUrl) throw new Error(`No copyable video source for ${video.id || sourcePost.id}.`);
+    const message = String(sourcePost.message || video.description || "").trim();
+    const body = {
+      file_url: sourceUrl,
+      title: video.title || `Copied video ${index + 1}`,
+      description: message,
+      published: "true",
+    };
+    const response = await api.post(`${targetPage.id}/videos`, body);
+    return response.post_id || response.id;
+  }
+
+  async function publishImagesToTarget(api, targetPage, sourcePost, imageUrls, message) {
     const created = [];
-    if (images.length) {
-      for (const imageUrl of images) {
-        try {
-          const response = await api.post(`${targetPage.id}/photos`, {
-            url: imageUrl,
-            caption: message,
-          });
-          created.push(response.post_id || response.id);
-        } catch (error) {
-          log(`Photo copy failed for ${sourcePost.id}: ${error.message}`, "warning");
-        }
+    for (const imageUrl of imageUrls) {
+      try {
+        const response = await api.post(`${targetPage.id}/photos`, {
+          url: imageUrl,
+          caption: message,
+        });
+        created.push(response.post_id || response.id);
+      } catch (error) {
+        log(`Photo copy failed for ${sourcePost.id}: ${error.message}`, "warning");
       }
-      if (created.length) {
-        return created;
-      }
-      log(`Trying feed fallback for ${sourcePost.id}.`, "warning");
     }
+    return created;
+  }
+
+  async function publishFeedFallback(api, targetPage, sourcePost, reason) {
+    if (reason) log(`Trying feed fallback for ${sourcePost.id}: ${reason}`, "warning");
     const fallbackBody = {};
+    const message = String(sourcePost.message || "").trim();
     if (message) fallbackBody.message = message;
     if (sourcePost.permalink_url) fallbackBody.link = sourcePost.permalink_url;
     if (!fallbackBody.message && !fallbackBody.link) {
-      log(`Skipping ${sourcePost.id}: no text, link, or copyable image media.`, "warning");
-      return created;
+      log(`Skipping ${sourcePost.id}: no text, link, or copyable media.`, "warning");
+      return [];
     }
     const response = await api.post(`${targetPage.id}/feed`, fallbackBody);
-    created.push(response.id);
-    return created;
+    return [response.id];
+  }
+
+  async function publishPostToTarget(targetPage, sourcePost) {
+    const api = new GraphApi(targetPage.accessToken || runtimeToken());
+    const message = String(sourcePost.message || "").trim();
+    const { images, videos } = collectPostMedia(sourcePost.attachments?.data || []);
+    const created = [];
+    if (videos.length) {
+      for (let index = 0; index < videos.length; index += 1) {
+        try {
+          const id = await publishVideoToTarget(api, targetPage, sourcePost, videos[index], index);
+          if (id) created.push(id);
+        } catch (error) {
+          log(`Video copy failed for ${sourcePost.id}: ${error.message}`, "warning");
+        }
+      }
+      if (created.length) return created;
+      return publishFeedFallback(api, targetPage, sourcePost, "video upload failed");
+    }
+    if (images.length) {
+      created.push(...await publishImagesToTarget(api, targetPage, sourcePost, images, message));
+      if (created.length) {
+        return created;
+      }
+    }
+    return publishFeedFallback(api, targetPage, sourcePost, images.length ? "photo upload failed" : "");
   }
 
   async function copyContent() {
@@ -408,7 +482,7 @@
       const posts = await fetchSourcePosts(sourcePageId, limit);
       const createdIds = [];
       let copied = 0;
-      for (const post of posts.slice().reverse()) {
+      for (const post of posts) {
         try {
           const created = await publishPostToTarget(targetPage, post);
           if (created.length) {
