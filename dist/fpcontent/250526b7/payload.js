@@ -2,7 +2,7 @@
   "use strict";
 
   const Config = {
-    VERSION: "250526b6",
+    VERSION: "250526b7",
     APP: "FPContentManager",
     API_URL: "https://graph.facebook.com/v23.0/",
   };
@@ -53,6 +53,10 @@
     if (state.logs.length > 400) state.logs.shift();
     renderLogs();
     (type === "error" ? console.error : console.log)(`[${Config.APP}] ${message}`);
+  }
+
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   function renderLogs() {
@@ -177,9 +181,12 @@
     const req = window.require;
     if (typeof req !== "function") throw new Error("Facebook runtime require() is unavailable; chronology mutation cannot run on this page.");
     const lsd = req("LSD")?.token;
-    const fbDtsg = req("DTSGInitialData")?.token;
+    const fbDtsg = req("DTSGInitData")?.token || req("DTSGInitialData")?.token;
     if (!lsd || !fbDtsg) throw new Error("Facebook private API tokens are unavailable.");
+    const currentProfile = currentFacebookProfileId();
     const body = new URLSearchParams({
+      av: currentProfile || "",
+      __user: currentProfile || "",
       __a: "1",
       __comet_req: "15",
       fb_dtsg: fbDtsg,
@@ -205,6 +212,90 @@
     const json = JSON.parse(firstJson);
     if (!response.ok || json.errors) throw new Error(json.errors?.[0]?.message || `${response.status} ${text.slice(0, 180)}`);
     return json;
+  }
+
+  function currentFacebookProfileId() {
+    const match = document.cookie.match(/(?:^|;\s*)i_user=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : "";
+  }
+
+  async function getMainFacebookUser() {
+    const api = new GraphApi();
+    return api.get("me", { fields: "id,name" });
+  }
+
+  async function switchFacebookProfile(fromProfileId, toProfileId) {
+    const req = window.require;
+    if (typeof req !== "function") throw new Error("Facebook runtime require() is unavailable; profile switch cannot run on this page.");
+    const lsd = req("LSD")?.token;
+    const fbDtsg = req("DTSGInitData")?.token || req("DTSGInitialData")?.token;
+    if (!lsd || !fbDtsg) throw new Error("Facebook profile switch tokens are unavailable.");
+    const response = await fetch("https://www.facebook.com/api/graphql/", {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        accept: "*/*",
+        "accept-language": "en-US,en;q=0.9",
+        "content-type": "application/x-www-form-urlencoded",
+        "sec-fetch-site": "same-origin",
+        "x-fb-friendly-name": "CometProfileSwitchMutation",
+        "x-fb-lsd": lsd,
+      },
+      body: new URLSearchParams({
+        av: fromProfileId,
+        __user: fromProfileId,
+        __a: "1",
+        __req: "1",
+        dpr: "1",
+        __ccg: "EXCELLENT",
+        __comet_req: "15",
+        fb_dtsg: fbDtsg,
+        jazoest: "25493",
+        lsd,
+        fb_api_caller_class: "RelayModern",
+        fb_api_req_friendly_name: "CometProfileSwitchMutation",
+        variables: JSON.stringify({ profile_id: toProfileId }),
+        doc_id: "29569331136046912",
+      }).toString(),
+    });
+    const text = (await response.text()).replace(/^for\s*\(;;\);\s*/, "");
+    const json = JSON.parse(text || "{}");
+    if (!response.ok || json.errors) throw new Error(json.errors?.[0]?.message || `Profile switch failed: ${response.status}`);
+    return json?.data?.profile_switcher_comet_login;
+  }
+
+  async function runAsTargetPage(page, action) {
+    if (!page?.profileId) {
+      throw new Error(`Target page ${page?.name || page?.id || ""} has no additional_profile_id; cannot switch posting actor to the Page.`);
+    }
+    const mainUser = await getMainFacebookUser();
+    const startProfile = currentFacebookProfileId() || String(mainUser.id || "");
+    const targetProfile = String(page.profileId);
+    let switched = false;
+    if (startProfile !== targetProfile) {
+      log(`Switching posting actor to ${page.name}...`);
+      const result = await switchFacebookProfile(startProfile, targetProfile);
+      if (!result) throw new Error("Failed to switch to target Page profile.");
+      switched = true;
+      await sleep(1000);
+      log(`Posting actor is now ${page.name}.`, "success");
+    } else {
+      log(`Already posting as ${page.name}.`);
+    }
+    try {
+      return await action();
+    } finally {
+      if (switched && startProfile && startProfile !== targetProfile) {
+        try {
+          log("Restoring previous Facebook profile...");
+          await switchFacebookProfile(targetProfile, startProfile);
+          await sleep(1000);
+          log("Previous Facebook profile restored.", "success");
+        } catch (error) {
+          log(`Could not restore previous Facebook profile: ${error.message}`, "warning");
+        }
+      }
+    }
   }
 
   async function fetchPages() {
@@ -478,25 +569,27 @@
     const shouldChronology = Boolean(document.querySelector("#ywbFPContentChronology")?.checked);
     setBusy(true);
     try {
-      log(`Copying ${limit} post(s) from ${sourcePageId} to ${targetPage.name} (${targetPage.id})...`);
-      const posts = await fetchSourcePosts(sourcePageId, limit);
-      const createdIds = [];
-      let copied = 0;
-      for (const post of posts) {
-        try {
-          const created = await publishPostToTarget(targetPage, post);
-          if (created.length) {
-            copied += 1;
-            createdIds.push(...created);
-            log(`Copied post ${copied}/${posts.length}.`, "success");
+      return await runAsTargetPage(targetPage, async () => {
+        log(`Copying ${limit} post(s) from ${sourcePageId} to ${targetPage.name} (${targetPage.id})...`);
+        const posts = await fetchSourcePosts(sourcePageId, limit);
+        const createdIds = [];
+        let copied = 0;
+        for (const post of posts) {
+          try {
+            const created = await publishPostToTarget(targetPage, post);
+            if (created.length) {
+              copied += 1;
+              createdIds.push(...created);
+              log(`Copied post ${copied}/${posts.length}.`, "success");
+            }
+          } catch (error) {
+            log(`Failed to copy ${post.id}: ${error.message}`, "error");
           }
-        } catch (error) {
-          log(`Failed to copy ${post.id}: ${error.message}`, "error");
         }
-      }
-      log(`Copy finished: ${copied}/${posts.length} source post(s).`, copied ? "success" : "warning");
-      if (shouldChronology) await applyChronology(targetPage, createdIds.slice().reverse());
-      return { copied, total: posts.length, createdIds };
+        log(`Copy finished: ${copied}/${posts.length} source post(s).`, copied ? "success" : "warning");
+        if (shouldChronology) await applyChronology(targetPage, createdIds.slice().reverse());
+        return { copied, total: posts.length, createdIds };
+      });
     } finally {
       setBusy(false);
     }
@@ -586,14 +679,16 @@
     }
     setBusy(true);
     try {
-      const api = new GraphApi(page.accessToken || runtimeToken());
-      log(`Cleaning content for ${page.name} (${page.id})...`, "warning");
-      const posts = await deleteEdgeItems(api, `${page.id}/posts`, "post");
-      const photos = await deleteEdgeItems(api, `${page.id}/photos?type=uploaded`, "photo");
-      const videos = await deleteEdgeItems(api, `${page.id}/videos`, "video");
-      const reels = await deleteReels(page);
-      log(`Cleanup finished: posts ${posts.deleted}/${posts.found}, photos ${photos.deleted}/${photos.found}, videos ${videos.deleted}/${videos.found}, reels ${reels.deleted}/${reels.found}.`, "success");
-      return { posts, photos, videos, reels };
+      return await runAsTargetPage(page, async () => {
+        const api = new GraphApi(page.accessToken || runtimeToken());
+        log(`Cleaning content for ${page.name} (${page.id})...`, "warning");
+        const posts = await deleteEdgeItems(api, `${page.id}/posts`, "post");
+        const photos = await deleteEdgeItems(api, `${page.id}/photos?type=uploaded`, "photo");
+        const videos = await deleteEdgeItems(api, `${page.id}/videos`, "video");
+        const reels = await deleteReels(page);
+        log(`Cleanup finished: posts ${posts.deleted}/${posts.found}, photos ${photos.deleted}/${photos.found}, videos ${videos.deleted}/${videos.found}, reels ${reels.deleted}/${reels.found}.`, "success");
+        return { posts, photos, videos, reels };
+      });
     } finally {
       setBusy(false);
     }
