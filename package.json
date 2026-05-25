@@ -1,8 +1,8 @@
 {
   "name": "fpcontentmanager",
-  "version": "250526b2",
+  "version": "250526b3",
   "private": true,
-  "description": "Browser-side Facebook Page content export, import, and cleanup tooling.",
+  "description": "Browser-side Facebook Page live content copy, chronology, and cleanup tooling.",
   "scripts": {
     "check": "node --check fpcontent-og-packager.js && node --check fpcontent-manager.js && node --check fpcontent-loader.js",
     "build": "node fpcontent-og-packager.js --base-url=https://fpcontentmanager.pages.dev/fpcontent",
