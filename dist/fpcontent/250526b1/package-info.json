@@ -2,12 +2,14 @@
   "app": "FPContentManager",
   "build": "250526b1",
   "version": "250526b1",
-  "generatedAt": "2026-05-25T10:30:57.680Z",
+  "generatedAt": "2026-05-25T10:49:54.541Z",
   "payload": {
     "encoding": "base64",
     "sha256": "fe5fe355cfa42577688490bd97f0e99cdabc606a198d1a43437ae293d37a9344",
     "byteLength": 18002
   },
+  "payloadUrl": "https://fpcontentmanager.pages.dev/fpcontent/250526b1/payload.js",
+  "latestPayloadUrl": "https://fpcontentmanager.pages.dev/fpcontent/latest/payload.js",
   "chunks": [
     {
       "index": 1,
@@ -22,8 +24,6 @@
   "source": "fpcontent-manager.js",
   "chunkSize": 350000,
   "payloadFile": "payload.js",
-  "payloadUrl": "https://fpcontentmanager.pages.dev/fpcontent/250526b1/payload.js",
-  "latestPayloadUrl": "https://fpcontentmanager.pages.dev/fpcontent/latest/payload.js",
   "manifestFile": "manifest.html",
   "manifestUrl": "https://fpcontentmanager.pages.dev/fpcontent/250526b1/manifest.html",
   "latestManifestUrl": "https://fpcontentmanager.pages.dev/fpcontent/latest/manifest.html"
