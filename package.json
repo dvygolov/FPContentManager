@@ -1,9 +1,11 @@
 {
   "name": "fpcontentmanager",
-  "version": "250526b7",
+  "version": "280526b1",
   "private": true,
   "description": "Browser-side Facebook Page live content copy, chronology, and cleanup tooling.",
   "scripts": {
+    "bump:build": "node scripts/bump-build-version.cjs",
+    "prebuild": "npm run bump:build",
     "check": "node --check fpcontent-og-packager.js && node --check fpcontent-manager.js && node --check fpcontent-loader.js",
     "build": "node fpcontent-og-packager.js --base-url=https://fpcontentmanager.pages.dev/fpcontent",
     "deploy": "npx wrangler pages deploy ./dist --project-name=fpcontentmanager --branch=main --commit-dirty=true"

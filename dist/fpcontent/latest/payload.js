@@ -2,7 +2,7 @@
   "use strict";
 
   const Config = {
-    VERSION: "250526b7",
+    VERSION: "280526b1",
     APP: "FPContentManager",
     API_URL: "https://graph.facebook.com/v23.0/",
   };
