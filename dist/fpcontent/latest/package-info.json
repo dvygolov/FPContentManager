@@ -1,0 +1,28 @@
+{
+  "app": "FPContentManager",
+  "build": "240626b1",
+  "version": "240626b1",
+  "generatedAt": "2026-06-24T10:33:20.211Z",
+  "payload": {
+    "encoding": "base64",
+    "sha256": "e77fc03a5e59e5deb2aa6a80784c949e561b91fe37650f58c8ad756a6a48270c",
+    "byteLength": 35436
+  },
+  "chunks": [
+    {
+      "index": 1,
+      "file": "og/chunk-001.html",
+      "url": "https://fpcontentmanager.pages.dev/fpcontent/240626b1/og/chunk-001.html",
+      "latestUrl": "https://fpcontentmanager.pages.dev/fpcontent/latest/og/chunk-001.html",
+      "ogObjectId": "",
+      "base64Length": 47248,
+      "base64Sha256": "4bb1de537d6347c8f47e47d5c76817c4d111920766b6bb27680af583331efad7"
+    }
+  ],
+  "source": "fpcontent-manager.js",
+  "chunkSize": 350000,
+  "payloadFile": "payload.js",
+  "manifestFile": "manifest.html",
+  "manifestUrl": "https://fpcontentmanager.pages.dev/fpcontent/240626b1/manifest.html",
+  "latestManifestUrl": "https://fpcontentmanager.pages.dev/fpcontent/latest/manifest.html"
+}
