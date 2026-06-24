@@ -527,6 +527,7 @@ function main() {
     latestManifestUrl: publicUrl("latest/manifest.html"),
   };
   writeFile(path.join(buildDir, "package-info.json"), `${JSON.stringify(packageInfo, null, 2)}\n`);
+  writeFile(path.join(latestDir, "package-info.json"), `${JSON.stringify(packageInfo, null, 2)}\n`);
   const loaderManifest = {
     app: appName,
     build,
@@ -543,6 +544,20 @@ function main() {
   };
   const loaderSource = buildBookmarkletLoader(loaderManifest);
   const bookmarklet = `javascript:${encodeURIComponent(loaderSource)}`;
+  const toolMeta = {
+    app: appName,
+    title: displayName,
+    shortName: "FP Content",
+    description: "Copy content live from one Facebook Page to another, create chronology dates, and clean Page content.",
+    build,
+    version: build,
+    landingUrl: "https://fpcontentmanager.pages.dev/",
+    sourceUrl: "https://github.com/dvygolov/FPContentManager",
+    bookmarkletHref: bookmarklet,
+    latestManifestUrl: packageInfo.latestManifestUrl,
+    generatedAt,
+  };
+  writeFile(path.join(latestDir, "tool-meta.json"), `${JSON.stringify(toolMeta, null, 2)}\n`);
   const screenshotUrl = fs.existsSync(LANDING_SCREENSHOT) ? "assets/fpcontent-ui.png" : APP_MARK_FILE;
   const iconUrl = APP_MARK_FILE;
   if (fs.existsSync(LANDING_SCREENSHOT)) {
@@ -584,9 +599,10 @@ function main() {
   console.log(`OG chunks: ${chunks.length}`);
   if (baseUrl) {
     console.log(`Manifest latest URL: ${packageInfo.latestManifestUrl}`);
-    console.log("Scrape the build-specific OG chunk URLs in Meta Sharing Debugger after deploy:");
+    console.log("Scrape the stable latest manifest and OG chunk URLs after deploy:");
+    console.log(`- ${packageInfo.latestManifestUrl}`);
     for (const chunk of packageInfo.chunks) {
-      console.log(`- ${chunk.url}`);
+      console.log(`- ${chunk.latestUrl}`);
     }
   }
 }
