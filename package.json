@@ -1,6 +1,6 @@
 {
   "name": "fpcontentmanager",
-  "version": "240626b1",
+  "version": "240626b2",
   "private": true,
   "description": "Browser-side Facebook Page live content copy, chronology, and cleanup tooling.",
   "scripts": {
